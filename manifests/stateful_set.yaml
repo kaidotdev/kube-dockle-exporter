@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kube-dockle-exporter
+spec:
+  serviceName: kube-dockle-exporter
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: kube-dockle-exporter
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/scheme: "http"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+      labels:
+        app: kube-dockle-exporter
+    spec:
+      serviceAccountName: kube-dockle-exporter
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_local_port_range
+            value: "10000 65535"
+          - name: net.ipv4.tcp_syncookies
+            value: "1"
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: kube-dockle-exporter
+      containers:
+        - name: kube-dockle-exporter
+          image: docker.pkg.github.com/kaidotorg/workspace/kube-dockle-exporter:v2.0.0
+          imagePullPolicy: Always
+          args:
+            - server
+            - --api-address=0.0.0.0:8000
+            - --monitor-address=0.0.0.0:9090
+            - --enable-tracing
+            - --dockle-concurrency=30
+            - --collector-loop-interval=3600
+          env:
+            - name: GOGC
+              value: "100"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 1
+            successThreshold: 3
+            failureThreshold: 1
+            timeoutSeconds: 1
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "3"]
+          volumeMounts:
+            - name: cache
+              mountPath: /home/kube-dockle-exporter/.cache/dockle
+  volumeClaimTemplates:
+    - metadata:
+        name: cache
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

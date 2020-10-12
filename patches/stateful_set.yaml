@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kube-dockle-exporter
+spec:
+  template:
+    spec:
+      containers:
+        - name: kube-dockle-exporter
+          image: kube-dockle-exporter
+          imagePullPolicy: Never
+          args:
+            - server
+            - --api-address=0.0.0.0:8000
+            - --monitor-address=0.0.0.0:9090
+            - --enable-profiling
+            - --enable-tracing
+            - --dockle-concurrency=1
+            - --collector-loop-interval=60
+            - --verbose
